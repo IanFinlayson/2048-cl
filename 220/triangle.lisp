@@ -15,8 +15,7 @@
      do (draw-row i size ch)))
 
 ; do it!
-(format t "Enter size and fill: ")
-(format t "~%")
+(format t "Enter size and fill:~%")
 (draw-triangle (read) (read))
 
 
