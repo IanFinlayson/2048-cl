@@ -3,7 +3,7 @@
   (format t "Enter message:~%")
   (let ((m (read-line)))
     (format t "Enter key~%")
-      (do-encdec m (read-line) op pre)))
+    (do-encdec m (read-line) op pre)))
 
 ; rotate the key around (abc -> bca)
 (defun rotate (k)
