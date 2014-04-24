@@ -1,15 +1,14 @@
 ; break a string into pieces
 (defun parse (str)
   (let ((result '()) (buff ""))
-    (loop for i from 0 to (- (length str) 1)
-      do
-        (if (char= (char str i) #\Space)
-          (progn (setf result (cons buff result))
-            (setf buff ""))
-          (setf buff (concatenate 'string buff (string (char str i))))))
-    (setf result (cons buff result))
-    (reverse result)))
+    (loop for i from 0 to (- (length str) 1) do
+      (if (char= (char str i) #\Space)
+        (progn (setf result (cons buff result))
+          (setf buff ""))
+        (setf buff (concatenate 'string buff (string (char str i))))))
+    (reverse (cons buff result))))
 
+; convert strings in a list to numbers
 (defun tonums (l)
   `(,(car l) ,(parse-integer (cadr l)) ,(parse-integer (caddr l))))
 
@@ -27,28 +26,42 @@
     (* (+ (floor (/ now 100)) 1) 100)
     (+ 1 now)))
 
-; queue functions
-(defun enqueue (q item)
-  (append q (list `(,(car item) ,(+ (cadr item) (caddr item))))))
-(defun front (q)
-  (car q))
-(defun dequeue (q)
-  (cdr q))
+; subtract two time of days correctly
+(defun time-sub (a b)
+  (-  (+ (* (floor (/ a 100)) 60) (mod a 100))
+      (+ (* (floor (/ b 100)) 60) (mod b 100))))
 
-; main program simulation
-(defun sim (minute queue data teller)
-  ;(format t "Time is ~a, queue is ~a~%" minute queue)
-  (cond ((and (not (null data)) (= minute (cadar data)))
-        (progn
-          (format t "~a got in line at ~a.~%" (caar data) minute)
-          (sim minute (enqueue queue (car data)) (cdr data) teller)))
-        ((and (not (null teller)) (= minute (cadr teller)))
-         (progn
-           (format t "~a is done at ~a.~%" (caar queue) minute)
-           (sim minute (dequeue queue) data (front queue))))
-        ((>= minute 1700) nil)
-        (t (sim (inc-time minute) queue data teller))))
+; main simulation function
+(defun sim ()
+  (let ((minute 900) (queue '()) (data (read-data)) (next nil) (total 0) (peeps 0))
+    (loop while (or next queue data) do
+      ;(format t "next ~a queue ~a~%~%" next queue)
+      ; if the person at the teller is done
+      (when (and next (= (caddr next) 0))
+        (incf peeps)
+        (incf total (time-sub minute (cadr next)))
+        (format t "~a is done at ~a.~%" (car next) minute)
+        ; move to next person in queue
+        (if (null queue)
+          (setf next nil)
+          (progn (setf next (car queue)) (setf queue (cdr queue)))))
+      ; if the next person is here
+      (when (and data (= (cadar data) minute))
+        (format t "~a got in line at ~a.~%" (caar data) minute)
+        ; move them to the queue
+        (setf queue (append queue `(,(car data))))
+        (setf data (cdr data)))
+      ; if there's a queue, and nobody is next
+      (when (and (null next) queue)
+        (setf next (car queue))
+        (setf queue (cdr queue)))
+      ; decrement the person waiting
+      (when (not (null next))
+        (decf (caddr next)))
+      ; tick tock
+      (setf minute (inc-time minute)))
+    (/ total peeps)))
 
-; start it all in motion
-(sim 900 '() (read-data) nil)
+; call it!
+(format t "Average wait time is ~4$ minutes.~%" (sim))
 
