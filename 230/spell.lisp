@@ -1,3 +1,13 @@
+; break a string into pieces
+(defun parse (str)
+  (let ((result '()) (buff ""))
+    (loop for i from 0 to (- (length str) 1) do
+      (if (char= (char str i) #\Space)
+        (progn (setf result (cons buff result))
+          (setf buff ""))
+        (setf buff (concatenate 'string buff (string (char str i))))))
+    (reverse (cons buff result))))
+
 ; insert a string into a binary search tree and return it
 (defun insert (tree str)
   (if (null tree)
@@ -12,6 +22,13 @@
     0
     (+ 1 (max (height (cadr tree)) (height (caddr tree))))))
 
+; search the bst returning the string or nil
+(defun look (tree str)
+  (cond ((null tree) nil)
+        ((string= str (car tree)) str)
+        ((string< str (car tree)) (look (cadr tree) str))
+        (t (look (caddr tree) str))))
+
 ; load a text file in and add each line to a binary search tree, returning it
 (defun read-data ()
   (let ((tree nil))
@@ -22,6 +39,15 @@
           (setf tree (insert tree line)))))
     tree))
 
-(format t "Height of tree is ~a.~%" (height (read-data)))
+; main program loop
+(defun main (tree)
+  (let ((words (parse (read-line))))
+    (unless (string= (car words) "END")
+      (dolist (bad (remove-if (lambda (w) (look tree w)) words))
+        (format t "~a is spelled wrong!~%" bad))
+      (main tree))))
 
+(let ((tree (read-data)))
+  (format t "Loaded the words into a tree with height =  ~a.~%" (height tree))
+  (main tree))
 
