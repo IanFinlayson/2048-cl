@@ -26,20 +26,42 @@
   (:qt-superclass "QWidget")
   (:override ("keyPressEvent" key-press-event)))
 
+; method to update the labels
+(defmethod update-board ((this board-widget))
+  (loop for row from 0 to 3 do
+    (loop for col from 0 to 3 do
+      (#_setText (index (board-labels this) row col) (write-to-string (index (board this) row col))))))
+
+; these methods each move the board in a specific direction
+; they return whether or not they made any change at all
 (defmethod left ((this board-widget))
-  (format t "left~%"))
+  (format t "left~%")
+  t)
 (defmethod right ((this board-widget))
-  (format t "right~%"))
+  (format t "right~%")
+  t)
 (defmethod up ((this board-widget))
-  (format t "up~%"))
+  (format t "up~%")
+  t)
 (defmethod down ((this board-widget))
-  (format t "down~%"))
+  (format t "down~%")
+  t)
+
+; this method adds a random 2 or 4 cell into an empty space
+(defmethod add-random ((this board-widget))
+  (let ((row (random 4)) (col (random 4)))
+    (if (= (index (board this) row col) 0)
+      (setf (nth col (nth row (board this))) (if (= (random 2) 0) 2 4))
+      (add-random this))))
 
 (defmethod key-press-event ((this board-widget) event)
-  (cond ((= (#_key event) 16777234) (left this))
+  (when (cond ((= (#_key event) 16777234) (left this))
         ((= (#_key event) 16777235) (up this))
         ((= (#_key event) 16777236) (right this))
-        ((= (#_key event) 16777237) (down this))))
+        ((= (#_key event) 16777237) (down this))
+        (t nil))
+    (add-random this))
+  (update-board this))
         
 ; the constructor for the board-widget
 (defmethod initialize-instance :after ((this board-widget) &key)
@@ -67,5 +89,6 @@
     (#_setGeometry window 100 100 500 355)))
 
 ; call the main function
+(setf *random-state* (make-random-state t))
 (main)
 
