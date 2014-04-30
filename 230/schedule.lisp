@@ -29,27 +29,40 @@
 
 ; returns a list of courses with no edges coming in
 (defun find-active (matrix)
-  (loop for i from 0 to (length matrix) collect
-    (if (member t (nth i matrix)) i)))
+  (let ((active '()))
+    (loop for i from 0 to (- (length matrix) 1) do
+      (unless (member t (nth i matrix))
+        (setf active (cons i active))))
+    active))
 
 ; do the topological sorting
 (defun top-sort (nodes matrix)
   (let ((ordering '())
         (active (find-active matrix)))
-    ))
+    (format t "Active set ~A~%" active)
+    ; while there are active nodes
+    (loop while (not (null active)) do
+      ; move a node from the active list to the ordering
+      (setf ordering (cons (first active) ordering))
+      (setf active (rest active))
+      ; clear the row for this edge
+      (loop for i from 0 to (- (length matrix) 1) do
+        (setf (nth i (nth (car ordering) matrix)) nil))
+      ; rec-calculate active set
+      (setf active (find-active matrix)))
+    (nreverse ordering)))
     
-
 ; run it
 (defun main (fname)
   (let* ((data (read-data fname))
          (nodes (make-nodes data))
-         (matrix (make-nodes data)))
+         (matrix (make-matrix data)))
     (top-sort nodes matrix)))
 
 ; get the argument
 ;(if (< (length *posix-argv*) 2)
   ;(format t "Error, run with an argument!~%")
   ;(main (second *posix-argv*)))
-(main "cs.txt")
+(format t "~A~%" (main "cs.txt"))
 
 
