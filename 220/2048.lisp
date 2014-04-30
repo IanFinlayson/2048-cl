@@ -18,6 +18,31 @@
 (defun index (l row col)
   (nth col (nth row l)))
 
+; this class represents a single cell in the game
+(defclass cell-widget ()
+  ((value :accessor value))
+  (:metaclass qt-class)
+  (:qt-superclass "QWidget")
+  (:override ("paintEvent" paint-event)))
+
+; the paint method for the cell, it draws the cell to the screen
+(defmethod paint-event ((this cell-widget) paint-event)
+  (declare (ignore paint-event))
+  (let ((painter (#_new QPainter this)))
+    (format t "Paint!~%")
+      (#_setPen painter (#_new QColor 242 177 121))
+      (#_setBrush painter (#_new QBrush (#_new QColor 242 177 121)))
+      (#_drawRect painter (#_new QRect 0 0 100 100))
+      (#_setPen painter (#_new QColor 255 255 255))
+      (#_setFont painter (#_new QFont "Arial" 28))
+      (#_drawText painter (#_new QRect 0 0 100 100) 132 (write-to-string (value this)))
+      (#_end painter)))
+
+; constructor for cell
+(defmethod initialize-instance :after ((this cell-widget) &key val)
+  (setf (value this) val)
+  (new this))
+
 ; make a board-widget class that derives from QWidget
 (defclass board-widget ()
   ((board :accessor board)
@@ -30,7 +55,8 @@
 (defmethod update-board ((this board-widget))
   (loop for row from 0 to 3 do
     (loop for col from 0 to 3 do
-      (#_setText (index (board-labels this) row col) (write-to-string (index (board this) row col))))))
+      (format t "TODO~%"))))
+          ;      (#_setText (index (board-labels this) row col) (write-to-string (index (board this) row col))))))
 
 ; these methods each move the board in a specific direction
 ; they return whether or not they made any change at all
@@ -83,7 +109,8 @@
       (loop for col from 0 to 3 collect 0)))
   (setf (board-labels this)
     (loop for row from 0 to 3 collect
-      (loop for col from 0 to 3 collect (#_new QLabel "0" this))))
+      ;(loop for col from 0 to 3 collect (#_new QLabel "0" this))))
+      (loop for col from 0 to 3 collect (make-instance 'cell-widget :val 0))))
   ; add two randoms and update the board
   (add-random this)
   (add-random this)
@@ -101,7 +128,8 @@
 ; make a new window
 (defun main ()
   (with-main-window (window (make-instance 'board-widget))
-    (#_setGeometry window 100 100 500 355)))
+    (#_setStyleSheet window "background-color: #C2B39A;")
+    (#_setFixedSize window 450 450)))
 
 ; call the main function
 (setf *random-state* (make-random-state t))
