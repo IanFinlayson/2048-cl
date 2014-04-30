@@ -92,36 +92,69 @@
 ; these methods each move the board in a specific direction
 ; they return whether or not they made any change at all
 (defmethod left ((this board-widget))
+  ; assume no change, set to true on change
   (let ((change nil))
     ; for each row
-    (loop for row from 0 to 3 do
-      ; for each column in reverse
-      (loop for col from 1 to 3 do
-        ; find v (current) and l (left)
-        (let ((v (value (index (board this) row col)))
-              (l (value (index (board this) row (- col 1)))))
-          ; when one to the left is empty, move it
-          (when (and (= l 0) (/= v 0))
-            (setf (value (index (board this) row (- col 1))) v)
-            (setf (value (index (board this) row col)) 0)
-            (setf change t))
-          ; when one to the left is equal, combine it
-          (when (and (= l v) (/= v 0))
-            (setf (value (index (board this) row (- col 1))) (* v 2))
-            (setf (value (index (board this) row col)) 0)
-            (setf change t)))))
+    (loop for i from 0 to 3 do
+      ; for each column
+      (loop for j from 0 to 3 do
+        ; when this cell is not zero
+        (when (/= (value (index (board this) i j)) 0)
+          ; for each cell from here to 1
+          (loop for k from j downto 1 do
+            ; if it can move to the right
+            (when (= (value (index (board this) i (- j k))) 0)
+              ; move it
+              (setf (value (index (board this) i (- j k))) (value (index (board this) i j)))
+              (setf (value (index (board this) i j)) 0)
+              (setf change t)))))
+      ; for each column
+      (loop for j from 0 to 3 do
+        ; if it can be combined
+        (when (and (< (+ j 1) 4) (= (value (index (board this) i j)) (value (index (board this) i (+ j 1)))))
+          ; combine it
+          (setf (value (index (board this) i j)) (* (value (index (board this) i j)) 2))
+          (setf (value (index (board this) i (+ j 1))) 0)
+          (when (/= (value (index (board this) i j)) 0)
+            (setf change t))))
+      ; check again to see if we can move things to the left
+      (loop for j from 0 to 3 do
+        (when (/= (value (index (board this) i j)) 0)
+          (loop for k from j downto 1 do
+            (when (= (value (index (board this) i (- j k))) 0)
+              (setf (value (index (board this) i (- j k))) (value (index (board this) i j)))
+              (setf (value (index (board this) i j)) 0)
+              (setf change t))))))
+    ; whether there was any change
     change))
 
+; this function rotates the board by 90 degrees counter-clockwise
+(defmethod rotate ((this board-widget))
+  (format t "TODO~%"))
 
+; to move right, rotate twice, left, rotate twice
 (defmethod right ((this board-widget))
-  (format t "right~%")
-  t)
+  (let ((change nil))
+    (dotimes (i 2) (rotate this))
+    (setf change (left this))
+    (dotimes (i 2) (rotate this))
+    change))
+    
+; to move up, rotate once, left, rotate 3 times
 (defmethod up ((this board-widget))
-  (format t "up~%")
-  t)
+  (let ((change nil))
+    (rotate this)
+    (setf change (left this))
+    (dotimes (i 3) (rotate this))
+    change))
+
+; to move down rotate three times, left, rotate once
 (defmethod down ((this board-widget))
-  (format t "down~%")
-  t)
+  (let ((change nil))
+    (dotimes (i 3) (rotate this))
+    (setf change (left this))
+    (rotate this)
+    change))
 
 ; this method checks if the board is full
 (defmethod fullp ((this board-widget))
