@@ -130,7 +130,7 @@
 
 ; this function rotates the board by 90 degrees counter-clockwise
 (defmethod rotate ((this board-widget))
-  (format t "TODO~%"))
+  (setf (board this) (reverse (apply #'mapcar #'list (board this)))))
 
 ; to move right, rotate twice, left, rotate twice
 (defmethod right ((this board-widget))
