@@ -15,14 +15,9 @@
 (named-readtables:in-readtable :qt)
 
 ; constants
-(defconstant +center-text+ 132)
-(defconstant +font-size+ 28)
+(defconstant +font-size+ 24)
 (defconstant +window-size+ 450)
 (defconstant +cell-size+ 100)
-(defconstant +left-key+ 16777234)
-(defconstant +up-key+ 16777235)
-(defconstant +right-key+ 16777236)
-(defconstant +down-key+ 16777237)
 
 ; indexes a 2d list
 (defun index (l row col)
@@ -52,6 +47,15 @@
     ((2 4) (#_new QColor 119 110 101))
     (otherwise (#_new QColor 249 246 242))))
 
+; this function asks a yes/no question with a dialog and returns the response
+(defun ask-question (title text)
+  (let ((dialog (#_new QMessageBox)))
+    (#_setWindowTitle dialog title)
+    (#_setText dialog text)
+    (#_addButton dialog (#_QMessageBox::No))
+    (#_addButton dialog (#_QMessageBox::Yes))
+    (= (#_exec dialog) (enum-value (#_QMessageBox::Yes)))))
+
 ; this class represents a single cell in the game
 (defclass cell-widget ()
   ((value :accessor value))
@@ -68,7 +72,7 @@
     (#_drawRect painter (#_new QRect 0 0 +cell-size+ +cell-size+))
     (#_setPen painter (text-color (value this)))
     (#_setFont painter (#_new QFont "Arial" +font-size+))
-    (#_drawText painter (#_new QRect 0 0 +cell-size+ +cell-size+) +center-text+ (write-to-string (value this)))
+    (#_drawText painter (#_new QRect 0 0 +cell-size+ +cell-size+) (enum-value (#_Qt::AlignCenter)) (write-to-string (value this)))
     (#_end painter)))
 
 ; constructor for cell
@@ -83,7 +87,7 @@
   (:qt-superclass "QWidget")
   (:override ("keyPressEvent" key-press-event)))
 
-; method to update the labels
+; method to update the widget
 (defmethod update-board ((this board-widget))
   (loop for row from 0 to 3 do
     (loop for col from 0 to 3 do
@@ -173,20 +177,69 @@
         (setf (value (nth col (nth row (board this)))) (if (= (random 2) 0) 2 4))
         (add-random this)))))
 
+; this method returns whether the game is lost TODO this fails because of 3
+(defmethod lostp ((this board-widget))
+  ; assume that we did lose
+  (let ((lost t))
+    ; check the verticals
+    (loop for i from 0 to 3 do
+      (loop for j from 0 to 2 do
+        (when (= (value (index (board this) i j)) (value (index (board this) i (+ j 1))))
+          (setf lost nil))))
+    ; check the horizontals
+    (loop for i from 0 to 2 do
+      (loop for j from 0 to 3 do
+        (when (= (value (index (board this) i j)) (value (index (board this) (+ i 1) j)))
+          (setf lost nil))))
+    ; check for zeroes
+    (when (not (fullp this))
+      (setf lost nil))
+    lost))
+        
+; this method returns whether the game is won
+(defmethod wonp ((this board-widget))
+  (let ((won nil))
+    (loop for i from 0 to 3 do
+      (loop for j from 0 to 3 do
+        (when (= (value (index (board this) i j)) 2048)
+          (setf won t))))
+    won))
+
+; this method checks for loss and win, and updates accordingly
+(defmethod check-end ((this board-widget))
+  (let ((quit nil) (reset nil))
+    ; if the game is won or lost, ask to reset
+    (when (lostp this)
+      (if (ask-question "Sorry" "You lost! Play again?")
+        (setf reset t)
+        (setf quit t)))
+    (when (wonp this)
+      (if (ask-question "Congratulations" "You won! Play again?")
+        (setf reset t)
+        (setf quit t)))
+    (when reset
+      (loop for row from 0 to 3 do
+        (loop for col from 0 to 3 do
+          (setf (value (index (board this) row col)) 0)))
+      (add-random this)
+      (add-random this))
+    (when quit
+      (#_QCoreApplication::exit 0))))
+  
 ; this is the main key press handler for the game
 (defmethod key-press-event ((this board-widget) event)
-  (when (cond ((= (#_key event) +left-key+) (left this))
-        ((= (#_key event) +up-key+) (up this))
-        ((= (#_key event) +right-key+) (right this))
-        ((= (#_key event) +down-key+) (down this))
+  (when (cond ((= (#_key event) (enum-value (#_Qt::Key_Left))) (left this))
+        ((= (#_key event) (enum-value (#_Qt::Key_Up))) (up this))
+        ((= (#_key event) (enum-value (#_Qt::Key_Right))) (right this))
+        ((= (#_key event) (enum-value (#_Qt::Key_Down))) (down this))
         (t nil))
-    (add-random this))
-  (update-board this))
+    (add-random this)
+    (update-board this)
+    (check-end this)))
         
 ; the constructor for the board-widget
 (defmethod initialize-instance :after ((this board-widget) &key)
   (new this)
-  ; clear the board
   (setf (board this)
     (loop for row from 0 to 3 collect
       (loop for col from 0 to 3 collect
@@ -197,7 +250,7 @@
   (update-board this)
   ; initialize the space (x, y, w, h) and title
   (#_setWindowTitle this "2048 Game")
-  ; add a grid layout of labels
+  ; add a grid layout of cells
   (let ((grid (#_new QGridLayout this)))
     (loop for row from 0 to 3 do
       (loop for col from 0 to 3 do
