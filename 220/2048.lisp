@@ -87,11 +87,20 @@
   (:qt-superclass "QWidget")
   (:override ("keyPressEvent" key-press-event)))
 
+; a macro for looping over the board
+(defmacro board-loop (&rest body)
+  `(loop for row from 0 to 3 do
+    (loop for col from 0 to 3 do
+      (progn ,@body))))
+
+; a macro for getting a board value
+(defmacro bval (r c)
+  `(value (index (board this) ,r ,c)))
+
 ; method to update the widget
 (defmethod update-board ((this board-widget))
-  (loop for row from 0 to 3 do
-    (loop for col from 0 to 3 do
-      (#_update (index (board this) row col)))))
+  (board-loop
+    (#_update (index (board this) row col))))
 
 ; these methods each move the board in a specific direction
 ; they return whether or not they made any change at all
@@ -99,35 +108,35 @@
   ; assume no change, set to true on change
   (let ((change nil))
     ; for each row
-    (loop for i from 0 to 3 do
+    (loop for row from 0 to 3 do
       ; for each column
-      (loop for j from 0 to 3 do
+      (loop for col from 0 to 3 do
         ; when this cell is not zero
-        (when (/= (value (index (board this) i j)) 0)
+        (when (/= (bval row col) 0)
           ; for each cell from here to 1
-          (loop for k from j downto 1 do
+          (loop for k from col downto 1 do
             ; if it can move to the right
-            (when (= (value (index (board this) i (- j k))) 0)
+            (when (= (bval row (- col k)) 0)
               ; move it
-              (setf (value (index (board this) i (- j k))) (value (index (board this) i j)))
-              (setf (value (index (board this) i j)) 0)
+              (setf (bval row (- col k)) (bval row col))
+              (setf (bval row col) 0)
               (setf change t)))))
       ; for each column
-      (loop for j from 0 to 3 do
+      (loop for col from 0 to 3 do
         ; if it can be combined
-        (when (and (< (+ j 1) 4) (= (value (index (board this) i j)) (value (index (board this) i (+ j 1)))))
+        (when (and (< (+ col 1) 4) (= (bval row col) (bval row (+ col 1))))
           ; combine it
-          (setf (value (index (board this) i j)) (* (value (index (board this) i j)) 2))
-          (setf (value (index (board this) i (+ j 1))) 0)
-          (when (/= (value (index (board this) i j)) 0)
+          (setf (bval row col) (* (bval row col) 2))
+          (setf (bval row (+ col 1)) 0)
+          (when (/= (bval row col) 0)
             (setf change t))))
       ; check again to see if we can move things to the left
-      (loop for j from 0 to 3 do
-        (when (/= (value (index (board this) i j)) 0)
-          (loop for k from j downto 1 do
-            (when (= (value (index (board this) i (- j k))) 0)
-              (setf (value (index (board this) i (- j k))) (value (index (board this) i j)))
-              (setf (value (index (board this) i j)) 0)
+      (loop for col from 0 to 3 do
+        (when (/= (bval row col) 0)
+          (loop for k from col downto 1 do
+            (when (= (bval row (- col k)) 0)
+              (setf (bval row (- col k)) (bval row col))
+              (setf (bval row col) 0)
               (setf change t))))))
     ; whether there was any change
     change))
@@ -163,33 +172,36 @@
 ; this method checks if the board is full
 (defmethod fullp ((this board-widget))
   (let ((full t))
-    (loop for row from 0 to 3 do
-      (loop for col from 0 to 3 do
-        (when (= (value (index (board this) row col)) 0)
-          (setf full nil))))
+    (board-loop
+      (when (= (bval row col) 0)
+          (setf full nil)))
     full))
 
 ; this method adds a random 2 or 4 cell into an empty space
-(defmethod add-random ((this board-widget))
+(defmethod add-random ((this board-widget) &optional (num 1))
+  (format t "NUM = ~A~%" num)
   (when (not (fullp this))
     (let ((row (random 4)) (col (random 4)))
-      (if (= (value (index (board this) row col)) 0)
+      (if (= (bval row col) 0)
         (setf (value (nth col (nth row (board this)))) (if (= (random 2) 0) 2 4))
-        (add-random this)))))
+        (add-random this))))
+  (when (> num 1)
+    (add-random this (- num 1))))
+  
 
-; this method returns whether the game is lost TODO this fails because of 3
+; this method returns whether the game is lost
 (defmethod lostp ((this board-widget))
   ; assume that we did lose
   (let ((lost t))
     ; check the verticals
-    (loop for i from 0 to 3 do
-      (loop for j from 0 to 2 do
-        (when (= (value (index (board this) i j)) (value (index (board this) i (+ j 1))))
+    (loop for row from 0 to 3 do
+      (loop for col from 0 to 2 do
+        (when (= (bval row col) (bval row (+ col 1)))
           (setf lost nil))))
     ; check the horizontals
-    (loop for i from 0 to 2 do
-      (loop for j from 0 to 3 do
-        (when (= (value (index (board this) i j)) (value (index (board this) (+ i 1) j)))
+    (loop for row from 0 to 2 do
+      (loop for col from 0 to 3 do
+        (when (= (bval row col) (bval (+ row 1) col))
           (setf lost nil))))
     ; check for zeroes
     (when (not (fullp this))
@@ -199,10 +211,9 @@
 ; this method returns whether the game is won
 (defmethod wonp ((this board-widget))
   (let ((won nil))
-    (loop for i from 0 to 3 do
-      (loop for j from 0 to 3 do
-        (when (= (value (index (board this) i j)) 2048)
-          (setf won t))))
+    (board-loop
+      (when (= (bval row col) 2048)
+        (setf won t)))
     won))
 
 ; this method checks for loss and win, and updates accordingly
@@ -220,9 +231,8 @@
     (when reset
       (loop for row from 0 to 3 do
         (loop for col from 0 to 3 do
-          (setf (value (index (board this) row col)) 0)))
-      (add-random this)
-      (add-random this))
+          (setf (bval row col) 0)))
+      (add-random this 2))
     (when quit
       (#_QCoreApplication::exit 0))))
   
@@ -233,7 +243,7 @@
         ((= (#_key event) (enum-value (#_Qt::Key_Right))) (right this))
         ((= (#_key event) (enum-value (#_Qt::Key_Down))) (down this))
         (t nil))
-    (add-random this)
+    (add-random this 1)
     (update-board this)
     (check-end this)))
         
@@ -245,16 +255,14 @@
       (loop for col from 0 to 3 collect
         (make-instance 'cell-widget :val 0))))
   ; add two randoms and update the board
-  (add-random this)
-  (add-random this)
+  (add-random this 2)
   (update-board this)
   ; initialize the space (x, y, w, h) and title
   (#_setWindowTitle this "2048 Game")
   ; add a grid layout of cells
   (let ((grid (#_new QGridLayout this)))
-    (loop for row from 0 to 3 do
-      (loop for col from 0 to 3 do
-        (#_addWidget grid (index (board this) row col) row col)))
+    (board-loop
+      (#_addWidget grid (index (board this) row col) row col))
     (#_setLayout this grid)))
 
 ; make a new window
