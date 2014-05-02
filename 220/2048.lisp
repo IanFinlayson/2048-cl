@@ -179,7 +179,6 @@
 
 ; this method adds a random 2 or 4 cell into an empty space
 (defmethod add-random ((this board-widget) &optional (num 1))
-  (format t "NUM = ~A~%" num)
   (when (not (fullp this))
     (let ((row (random 4)) (col (random 4)))
       (if (= (bval row col) 0)
