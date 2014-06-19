@@ -25,20 +25,22 @@
 
 ; this function returns the background color for a given value
 (defun bg-color (val)
-  (case val
-    (0 (#_new QColor 204 192 179))
-    (2 (#_new QColor 238 228 218))
-    (4 (#_new QColor 237 224 200))
-    (8 (#_new QColor 242 177 121))
-    (16 (#_new QColor 245 149 99))
-    (32 (#_new QColor 246 124 95))
-    (64 (#_new QColor 246 94 59))
-    (128 (#_new QColor 237 207 114))
-    (256 (#_new QColor 237 204 97))
-    (512 (#_new QColor 237 200 80))
-    (1024 (#_new QColor 237 197 63))
-    (2048 (#_new QColor 237 194 46))
-    (otherwise (#_new QColor 47 43 37))))
+  (let ((color-vals
+    (case val
+      (0 '(204 192 179))
+      (2 '(238 228 218))
+      (4 '(237 224 200))
+      (8 '(242 177 121))
+      (16 '(245 149 99))
+      (32 '(246 124 95))
+      (64 '(246 94 59))
+      (128 '(237 207 114))
+      (256 '(237 204 97))
+      (512 '(237 200 80))
+      (1024 '(237 197 63))
+      (2048 '(237 194 46))
+      (otherwise '(47 43 37)))))
+    (#_new QColor (first color-vals) (second color-vals) (third color-vals))))
 
 ; this function returns the text color for a given value
 (defun text-color (val)
@@ -88,9 +90,9 @@
   (:override ("keyPressEvent" key-press-event)))
 
 ; a macro for looping over the board
-(defmacro board-loop (&rest body)
-  `(loop for row from 0 to 3 do
-    (loop for col from 0 to 3 do
+(defmacro board-loop ((row a b) (col c d) form &body body)
+  `(loop for row from ,a to ,b ,form
+    (loop for col from ,c to ,d ,form
       (progn ,@body))))
 
 ; a macro for getting a board value
@@ -99,7 +101,7 @@
 
 ; method to update the widget
 (defmethod update-board ((this board-widget))
-  (board-loop
+  (board-loop (row 0 3) (col 0 3) do
     (#_update (index (board this) row col))))
 
 ; these methods each move the board in a specific direction
@@ -107,21 +109,23 @@
 (defmethod left ((this board-widget))
   ; assume no change, set to true on change
   (let ((change nil))
-    ; for each row
-    (loop for row from 0 to 3 do
+    ; define a local function for shifting left once
+    (flet ((shift-left (row)
       ; for each column
       (loop for col from 0 to 3 do
         ; when this cell is not zero
         (when (/= (bval row col) 0)
           ; for each cell from here to 1
           (loop for k from col downto 1 do
-            ; if it can move to the right
+            ; if it can move to the right, move it
             (when (= (bval row (- col k)) 0)
-              ; move it
               (setf (bval row (- col k)) (bval row col))
               (setf (bval row col) 0)
-              (setf change t)))))
-      ; for each column
+              (setf change t)))))))
+    ; for each row
+    (loop for row from 0 to 3 do
+      (shift-left row)
+      ; now we need to compact the adjacent ones
       (loop for col from 0 to 3 do
         ; if it can be combined
         (when (and (< (+ col 1) 4) (= (bval row col) (bval row (+ col 1))))
@@ -131,15 +135,9 @@
           (when (/= (bval row col) 0)
             (setf change t))))
       ; check again to see if we can move things to the left
-      (loop for col from 0 to 3 do
-        (when (/= (bval row col) 0)
-          (loop for k from col downto 1 do
-            (when (= (bval row (- col k)) 0)
-              (setf (bval row (- col k)) (bval row col))
-              (setf (bval row col) 0)
-              (setf change t))))))
+      (shift-left row))
     ; whether there was any change
-    change))
+    change)))
 
 ; this function rotates the board by 90 degrees counter-clockwise
 (defmethod rotate ((this board-widget))
@@ -172,7 +170,7 @@
 ; this method checks if the board is full
 (defmethod fullp ((this board-widget))
   (let ((full t))
-    (board-loop
+    (board-loop (row 0 3) (col 0 3) do
       (when (= (bval row col) 0)
           (setf full nil)))
     full))
@@ -193,15 +191,13 @@
   ; assume that we did lose
   (let ((lost t))
     ; check the verticals
-    (loop for row from 0 to 3 do
-      (loop for col from 0 to 2 do
-        (when (= (bval row col) (bval row (+ col 1)))
-          (setf lost nil))))
+    (board-loop (row 0 3) (col 0 2) do
+      (when (= (bval row col) (bval row (+ col 1)))
+        (setf lost nil)))
     ; check the horizontals
-    (loop for row from 0 to 2 do
-      (loop for col from 0 to 3 do
-        (when (= (bval row col) (bval (+ row 1) col))
-          (setf lost nil))))
+    (board-loop (row 0 2) (col 0 3) do
+      (when (= (bval row col) (bval (+ row 1) col))
+        (setf lost nil)))
     ; check for zeroes
     (when (not (fullp this))
       (setf lost nil))
@@ -210,7 +206,7 @@
 ; this method returns whether the game is won
 (defmethod wonp ((this board-widget))
   (let ((won nil))
-    (board-loop
+    (board-loop (row 0 3) (col 0 3) do
       (when (= (bval row col) 2048)
         (setf won t)))
     won))
@@ -228,9 +224,8 @@
         (setf reset t)
         (setf quit t)))
     (when reset
-      (loop for row from 0 to 3 do
-        (loop for col from 0 to 3 do
-          (setf (bval row col) 0)))
+      (board-loop (row 0 3) (col 0 3) do
+        (setf (bval row col) 0))
       (add-random this 2))
     (when quit
       (#_QCoreApplication::exit 0))))
@@ -250,9 +245,8 @@
 (defmethod initialize-instance :after ((this board-widget) &key)
   (new this)
   (setf (board this)
-    (loop for row from 0 to 3 collect
-      (loop for col from 0 to 3 collect
-        (make-instance 'cell-widget :val 0))))
+    (board-loop (row 0 3) (col 0 3) collect
+      (make-instance 'cell-widget :val 0)))
   ; add two randoms and update the board
   (add-random this 2)
   (update-board this)
@@ -260,7 +254,7 @@
   (#_setWindowTitle this "2048 Game")
   ; add a grid layout of cells
   (let ((grid (#_new QGridLayout this)))
-    (board-loop
+    (board-loop (row 0 3) (col 0 3) do
       (#_addWidget grid (index (board this) row col) row col))
     (#_setLayout this grid)))
 
