@@ -1,4 +1,5 @@
-lispstuff
+CL-2048
 =========
 
-Me just learning common lisp
+A 2048 clone written in Common Lisp with QT.
+
